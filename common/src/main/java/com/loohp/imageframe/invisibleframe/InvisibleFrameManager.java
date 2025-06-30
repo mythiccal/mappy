@@ -22,8 +22,9 @@ package com.loohp.imageframe.invisibleframe;
 
 import com.loohp.imageframe.ImageFrame;
 import com.loohp.imageframe.nms.NMS;
-import com.loohp.imageframe.objectholders.Scheduler;
 import com.loohp.imageframe.utils.MCVersion;
+import com.loohp.platformscheduler.ScheduledTask;
+import com.loohp.platformscheduler.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -101,16 +102,18 @@ public class InvisibleFrameManager implements Listener {
 
     private void addRecipes() {
         ItemStack result = new ItemStack(Material.valueOf("GLOW_ITEM_FRAME"));
-        CraftingRecipe vanillaRecipe = (CraftingRecipe) Bukkit.getRecipesFor(result).stream()
-                .filter(r -> r instanceof CraftingRecipe)
-                .findFirst()
-                .orElse(null);
         ShapelessRecipe recipe = new ShapelessRecipe(INVISIBLE_GLOW_ITEM_FRAME_CRAFTING_KEY, withInvisibleItemFrameData(result))
                 .addIngredient(Material.valueOf("GLOW_INK_SAC"))
                 .addIngredient(new RecipeChoice.ExactChoice(withInvisibleItemFrameData(new ItemStack(Material.ITEM_FRAME))));
-        if (vanillaRecipe != null) {
-            recipe.setCategory(vanillaRecipe.getCategory());
-            recipe.setGroup(vanillaRecipe.getGroup());
+        if (ImageFrame.version.isNewerOrEqualTo(MCVersion.V1_20)) {
+            CraftingRecipe vanillaRecipe = (CraftingRecipe) Bukkit.getRecipesFor(result).stream()
+                    .filter(r -> r instanceof CraftingRecipe)
+                    .findFirst()
+                    .orElse(null);
+            if (vanillaRecipe != null) {
+                recipe.setCategory(vanillaRecipe.getCategory());
+                recipe.setGroup(vanillaRecipe.getGroup());
+            }
         }
         Bukkit.addRecipe(recipe);
     }
@@ -163,10 +166,10 @@ public class InvisibleFrameManager implements Listener {
             if (ImageFrame.invisibleFrameGlowEmptyFrames) {
                 itemFrame.setGlowing(true);
             }
-            itemFrame.setInvisible(false);
+            itemFrame.setVisible(true);
         } else {
             itemFrame.setGlowing(false);
-            itemFrame.setInvisible(true);
+            itemFrame.setVisible(false);
         }
     }
 
@@ -320,7 +323,7 @@ public class InvisibleFrameManager implements Listener {
             return;
         }
         AtomicReference<Runnable> runnableReference = new AtomicReference<>(null);
-        AtomicReference<Scheduler.ScheduledTask> taskReference = new AtomicReference<>(null);
+        AtomicReference<ScheduledTask> taskReference = new AtomicReference<>(null);
         runnableReference.set(new Runnable() {
             int conversionsRemaining = ImageFrame.invisibleFrameMaxConversionsPerSplash;
             boolean firstTick = true;
@@ -329,7 +332,7 @@ public class InvisibleFrameManager implements Listener {
                 if (firstTick) {
                     firstTick = false;
                 } else if (!areaEffectCloud.isValid()) {
-                    Scheduler.ScheduledTask task = taskReference.get();
+                    ScheduledTask task = taskReference.get();
                     if (task != null) {
                         task.cancel();
                     }

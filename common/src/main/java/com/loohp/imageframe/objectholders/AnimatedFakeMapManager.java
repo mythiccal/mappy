@@ -27,7 +27,10 @@ import com.loohp.imageframe.nms.NMS;
 import com.loohp.imageframe.utils.FakeItemUtils;
 import com.loohp.imageframe.utils.MapUtils;
 import com.loohp.imageframe.utils.ModernEventsUtils;
+import com.loohp.platformscheduler.Scheduler;
+import com.loohp.platformscheduler.platform.folia.FoliaScheduler;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -99,7 +102,7 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
                 try {
                     if (itemFrame.isValid()) {
                         Set<Player> trackedPlayers;
-                        if (Scheduler.FOLIA) {
+                        if (Scheduler.getPlatform() instanceof FoliaScheduler) {
                             try {
                                 //noinspection deprecation
                                 trackedPlayers = itemFrame.getTrackedPlayers();
@@ -180,6 +183,7 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
                 }
             }
             ImageMap imageMap = animationData.getImageMap();
+
             if (!imageMap.requiresAnimationService()) {
                 data.setAnimationData(AnimationData.EMPTY);
                 continue;
@@ -192,8 +196,7 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
             }
             Set<Player> requiresSending = new HashSet<>();
             Set<Player> needReset = new HashSet<>();
-            Iterator<Player> itr = players.iterator();
-            while (itr.hasNext()) {
+            for (Iterator<Player> itr = players.iterator(); itr.hasNext();) {
                 Player player = itr.next();
                 MapMarkerEditManager.MapMarkerEditData edit = ImageFrame.mapMarkerEditManager.getActiveEditing(player);
                 if (edit != null && Objects.equals(edit.getImageMap(), imageMap)) {
@@ -205,8 +208,11 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
                 Set<Integer> pendingKnownIds = pendingKnownMapIds.get(player);
                 if (knownIds != null && !knownIds.contains(mapId)) {
                     if (pendingKnownIds != null && !pendingKnownIds.contains(mapId)) {
-                        pendingKnownIds.addAll(imageMap.getFakeMapIds());
-                        requiresSending.add(player);
+                        Set<Integer> fakeMapIds = imageMap.getFakeMapIds();
+                        if (fakeMapIds != null) {
+                            pendingKnownIds.addAll(fakeMapIds);
+                            requiresSending.add(player);
+                        }
                     }
                     itr.remove();
                 }
@@ -307,9 +313,12 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChunkLoad(ChunkLoadEvent event) {
-        for (Entity entity : event.getChunk().getEntities()) {
-            handleEntity(entity);
-        }
+        Chunk chunk = event.getChunk();
+        Scheduler.executeOrScheduleSync(ImageFrame.plugin, () -> {
+            for (Entity entity : chunk.getEntities()) {
+                handleEntity(entity);
+            }
+        }, chunk);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -362,11 +371,13 @@ public class AnimatedFakeMapManager implements Listener, Runnable {
         }
         Scheduler.runTaskAsynchronously(ImageFrame.plugin, () -> {
             Set<Integer> ids = imageMap.getFakeMapIds();
-            for (Set<Integer> knownIds : knownMapIds.values()) {
-                knownIds.removeAll(ids);
-            }
-            for (Set<Integer> pendingKnownIds : pendingKnownMapIds.values()) {
-                pendingKnownIds.removeAll(ids);
+            if (ids != null) {
+                for (Set<Integer> knownIds : knownMapIds.values()) {
+                    knownIds.removeAll(ids);
+                }
+                for (Set<Integer> pendingKnownIds : pendingKnownMapIds.values()) {
+                    pendingKnownIds.removeAll(ids);
+                }
             }
         });
     }

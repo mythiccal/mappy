@@ -25,7 +25,6 @@ import com.loohp.imageframe.objectholders.CombinedMapItemInfo;
 import com.loohp.imageframe.objectholders.MutablePair;
 import com.loohp.imageframe.utils.ReflectionUtils;
 import com.loohp.imageframe.utils.UUIDUtils;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.kyori.adventure.key.Key;
 import net.minecraft.EnumChatFormat;
 import net.minecraft.core.Holder;
@@ -57,14 +56,14 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
-import org.bukkit.craftbukkit.v1_21_R3.CraftWorld;
-import org.bukkit.craftbukkit.v1_21_R3.entity.CraftEntity;
-import org.bukkit.craftbukkit.v1_21_R3.entity.CraftPlayer;
-import org.bukkit.craftbukkit.v1_21_R3.inventory.CraftItemStack;
-import org.bukkit.craftbukkit.v1_21_R3.map.CraftMapCursor;
-import org.bukkit.craftbukkit.v1_21_R3.map.CraftMapView;
-import org.bukkit.craftbukkit.v1_21_R3.map.RenderData;
-import org.bukkit.craftbukkit.v1_21_R3.util.CraftChatMessage;
+import org.bukkit.craftbukkit.v1_21_R4.CraftWorld;
+import org.bukkit.craftbukkit.v1_21_R4.entity.CraftEntity;
+import org.bukkit.craftbukkit.v1_21_R4.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_21_R4.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.v1_21_R4.map.CraftMapCursor;
+import org.bukkit.craftbukkit.v1_21_R4.map.CraftMapView;
+import org.bukkit.craftbukkit.v1_21_R4.map.RenderData;
+import org.bukkit.craftbukkit.v1_21_R4.util.CraftChatMessage;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -84,21 +83,28 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
-public class V1_21_4 extends NMSWrapper {
+public class V1_21_5 extends NMSWrapper {
 
     private final Field nmsEntityByteDataWatcherField;
     private final Field craftMapViewWorldMapField;
-    private final Field persistentIdCountsUsedAuxIdsField;
+    private final Field persistentIdCountsLastMapIdField;
     private final Field renderDataCursorsField;
 
-    public V1_21_4() {
+    public V1_21_5() {
         try {
             nmsEntityByteDataWatcherField = ReflectionUtils.findDeclaredField(net.minecraft.world.entity.Entity.class, DataWatcherObject.class, "DATA_SHARED_FLAGS_ID", "am");
             craftMapViewWorldMapField = CraftMapView.class.getDeclaredField("worldMap");
-            persistentIdCountsUsedAuxIdsField = ReflectionUtils.findDeclaredField(PersistentIdCounts.class, Object2IntMap.class, "usedAuxIds", "b");
+            Field persistentIdCountsLastMapIdField0;
+            try {
+                persistentIdCountsLastMapIdField0 = ReflectionUtils.findDeclaredField(PersistentIdCounts.class, int.class, "lastMapId", "d");
+            } catch (NoSuchFieldException e) {
+                persistentIdCountsLastMapIdField0 = ReflectionUtils.findDeclaredField(PersistentIdCounts.class, AtomicInteger.class, "lastMapId", "d");
+            }
+            persistentIdCountsLastMapIdField = persistentIdCountsLastMapIdField0;
             renderDataCursorsField = RenderData.class.getField("cursors");
         } catch (NoSuchFieldException e) {
             throw new RuntimeException(e);
@@ -121,20 +127,20 @@ public class V1_21_4 extends NMSWrapper {
             throw new IllegalArgumentException("colors array length must be " + COLOR_ARRAY_LENGTH);
         }
         WorldMap nmsWorldMap = getWorldMap(mapView);
-        nmsWorldMap.g = colors;
+        nmsWorldMap.h = colors;
     }
 
     @Override
     public Collection<Player> getViewers(MapView mapView) {
         WorldMap nmsWorldMap = getWorldMap(mapView);
-        Map<EntityHuman, WorldMap.WorldMapHumanTracker> humansMap = nmsWorldMap.p;
+        Map<EntityHuman, WorldMap.WorldMapHumanTracker> humansMap = nmsWorldMap.q;
         return Collections2.transform(humansMap.keySet(), e -> (Player) e.getBukkitEntity());
     }
 
     @Override
     public boolean hasViewers(MapView mapView) {
         WorldMap nmsWorldMap = getWorldMap(mapView);
-        Map<EntityHuman, WorldMap.WorldMapHumanTracker> humansMap = nmsWorldMap.p;
+        Map<EntityHuman, WorldMap.WorldMapHumanTracker> humansMap = nmsWorldMap.q;
         return !humansMap.isEmpty();
     }
 
@@ -156,21 +162,24 @@ public class V1_21_4 extends NMSWrapper {
         return decorationTypeHolder.a().c();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public int getNextAvailableMapId(World world) {
         try {
-            persistentIdCountsUsedAuxIdsField.setAccessible(true);
+            persistentIdCountsLastMapIdField.setAccessible(true);
             WorldServer worldServer = ((CraftWorld) world).getHandle();
-            PersistentIdCounts persistentIdCounts = worldServer.p().J().w().a(PersistentIdCounts.a(), PersistentIdCounts.a);
-            Object2IntMap<String> usedAuxIds = (Object2IntMap<String>) persistentIdCountsUsedAuxIdsField.get(persistentIdCounts);
-            return usedAuxIds.getInt("map") + 1;
+            PersistentIdCounts persistentIdCounts = worldServer.p().J().w().a(PersistentIdCounts.b);
+            if (persistentIdCountsLastMapIdField.getType().equals(AtomicInteger.class)) {
+                AtomicInteger atomicInteger = (AtomicInteger) persistentIdCountsLastMapIdField.get(persistentIdCounts);
+                return atomicInteger.get() + 1;
+            } else {
+                return persistentIdCountsLastMapIdField.getInt(persistentIdCounts) + 1;
+            }
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
 
-    @SuppressWarnings({"deprecation", "unchecked"})
+    @SuppressWarnings("deprecation")
     @Override
     public MapView getMapOrCreateMissing(World world, int id) {
         try {
@@ -178,20 +187,22 @@ public class V1_21_4 extends NMSWrapper {
             if (mapView != null) {
                 return mapView;
             }
-            persistentIdCountsUsedAuxIdsField.setAccessible(true);
+            persistentIdCountsLastMapIdField.setAccessible(true);
             Location spawnLocation = world.getSpawnLocation();
             WorldServer worldServer = ((CraftWorld) world).getHandle();
-            ResourceKey<net.minecraft.world.level.World> worldTypeKey = worldServer.ai();
+            ResourceKey<net.minecraft.world.level.World> worldTypeKey = worldServer.aj();
             WorldMap worldMap = WorldMap.a(spawnLocation.getX(), spawnLocation.getZ(), (byte) 3, false, false, worldTypeKey);
             MapId mapId = new MapId(id);
             worldServer.a(mapId, worldMap);
-            PersistentIdCounts persistentIdCounts = worldServer.p().J().w().a(PersistentIdCounts.a(), PersistentIdCounts.a);
-            Object2IntMap<String> usedAuxIds = (Object2IntMap<String>) persistentIdCountsUsedAuxIdsField.get(persistentIdCounts);
-            int freeAuxValue = usedAuxIds.getInt("map");
-            if (freeAuxValue < id) {
-                usedAuxIds.put("map", id);
-                persistentIdCounts.c();
+            PersistentIdCounts persistentIdCounts = worldServer.p().J().w().a(PersistentIdCounts.b);
+            if (persistentIdCountsLastMapIdField.getType().equals(AtomicInteger.class)) {
+                AtomicInteger atomicInteger = (AtomicInteger) persistentIdCountsLastMapIdField.get(persistentIdCounts);
+                atomicInteger.getAndUpdate(lastMapId -> Math.max(lastMapId, id));
+            } else {
+                int lastMapId = persistentIdCountsLastMapIdField.getInt(persistentIdCounts);
+                persistentIdCountsLastMapIdField.setInt(persistentIdCounts, Math.max(lastMapId, id));
             }
+            persistentIdCounts.f();
             return Bukkit.getMap(id);
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
@@ -238,7 +249,7 @@ public class V1_21_4 extends NMSWrapper {
 
             nmsEntityByteDataWatcherField.setAccessible(true);
 
-            DataWatcher watcher = nmsEntity.au();
+            DataWatcher watcher = nmsEntity.ar();
             DataWatcherObject<Byte> byteField = (DataWatcherObject<Byte>) nmsEntityByteDataWatcherField.get(null);
             byte value = watcher.a(byteField);
 
@@ -269,6 +280,7 @@ public class V1_21_4 extends NMSWrapper {
         ((CraftPlayer) player).getHandle().f.sendPacket((Packet<?>) packet);
     }
 
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
     public CombinedMapItemInfo getCombinedMapItemInfo(ItemStack itemStack) {
         net.minecraft.world.item.ItemStack nmsItemStack = CraftItemStack.asNMSCopy(itemStack);
@@ -277,15 +289,15 @@ public class V1_21_4 extends NMSWrapper {
             return null;
         }
         NBTTagCompound tag = customData.d();
-        if (!tag.e(CombinedMapItemInfo.KEY)) {
+        if (!tag.b(CombinedMapItemInfo.KEY)) {
             return null;
         }
-        int imageMapIndex = tag.h(CombinedMapItemInfo.KEY);
-        if (!tag.e(CombinedMapItemInfo.PLACEMENT_UUID_KEY) || !tag.e(CombinedMapItemInfo.PLACEMENT_YAW_KEY)) {
+        int imageMapIndex = tag.b(CombinedMapItemInfo.KEY, -1);
+        if (!tag.b(CombinedMapItemInfo.PLACEMENT_UUID_KEY) || !tag.b(CombinedMapItemInfo.PLACEMENT_YAW_KEY)) {
             return new CombinedMapItemInfo(imageMapIndex);
         }
-        float yaw = tag.j(CombinedMapItemInfo.PLACEMENT_YAW_KEY);
-        UUID uuid = UUIDUtils.fromIntArray(tag.n(CombinedMapItemInfo.PLACEMENT_UUID_KEY));
+        float yaw = tag.b(CombinedMapItemInfo.PLACEMENT_YAW_KEY, 0F);
+        UUID uuid = UUIDUtils.fromIntArray(tag.k(CombinedMapItemInfo.PLACEMENT_UUID_KEY).get());
         return new CombinedMapItemInfo(imageMapIndex, new CombinedMapItemInfo.PlacementInfo(yaw, uuid));
     }
 
@@ -329,15 +341,15 @@ public class V1_21_4 extends NMSWrapper {
     public List<ItemStack> giveItems(Player player, List<ItemStack> itemStacks) {
         List<ItemStack> leftovers = new ArrayList<>();
         EntityPlayer nmsPlayer = ((CraftPlayer) player).getHandle();
-        PlayerInventory inventory = nmsPlayer.gi();
+        PlayerInventory inventory = nmsPlayer.gj();
         for (ItemStack itemStack : itemStacks) {
             net.minecraft.world.item.ItemStack nmsItemStack = CraftItemStack.asNMSCopy(itemStack);
-            boolean added = inventory.f(nmsItemStack);
+            boolean added = inventory.g(nmsItemStack);
             if (!added || !nmsItemStack.f()) {
                 leftovers.add(CraftItemStack.asBukkitCopy(nmsItemStack));
             }
         }
-        nmsPlayer.cd.d();
+        nmsPlayer.bR.d();
         return leftovers;
     }
 

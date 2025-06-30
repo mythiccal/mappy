@@ -20,33 +20,32 @@
 
 package com.loohp.imageframe.utils;
 
-import sun.misc.Unsafe;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
-import java.lang.reflect.Field;
-
-public class UnsafeAccessor {
-
-    private static final Field unsafeField;
-    private static Unsafe unsafe;
-
-    static {
-        try {
-            unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static Unsafe getUnsafe() {
-        if (unsafe != null) {
-            return unsafe;
-        }
-        try {
-            unsafeField.setAccessible(true);
-            return unsafe = (Unsafe) unsafeField.get(null);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-    }
+public class DataTypeIO {
+	
+	public static int readVarInt(DataInputStream in) throws IOException {
+		int i = 0;
+		int j = 0;
+		byte b;
+		do {
+			b = in.readByte();
+			i |= (b & 127) << j++ * 7;
+			if (j > 5) {
+				throw new RuntimeException("VarInt too big");
+			}
+		} while ((b & 128) == 128);
+		return i;
+	}
+	
+	public static void writeVarInt(DataOutputStream out, int value) throws IOException {
+		while ((value & -128) != 0) {
+			out.writeByte(value & 127 | 128);
+			value >>>= 7;
+		}
+		out.writeByte(value);
+	}
 
 }

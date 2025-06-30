@@ -28,6 +28,7 @@ import com.loohp.imageframe.nms.NMS;
 import com.loohp.imageframe.utils.MapUtils;
 import com.loohp.imageframe.utils.PlayerUtils;
 import com.loohp.imageframe.utils.StringUtils;
+import com.loohp.platformscheduler.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Rotation;
@@ -40,6 +41,7 @@ import org.bukkit.map.MapCursor;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -90,7 +92,7 @@ public abstract class ImageMap {
     protected ImageMapAccessControl accessControl;
     protected final long creationTime;
 
-    private final ImageMapCacheControlTask cacheControlTask;
+    protected final ImageMapCacheControlTask cacheControlTask;
     private boolean isValid;
 
     public ImageMap(ImageMapManager manager, int imageIndex, String name, List<MapView> mapViews, List<Integer> mapIds, List<Map<String, MapCursor>> mapMarkers, int width, int height, DitheringType ditheringType, UUID creator, Map<UUID, ImageMapAccessPermissionType> hasAccess, long creationTime) {
@@ -116,7 +118,7 @@ public abstract class ImageMap {
         this.accessControl = new ImageMapAccessControl(this, hasAccess);
         this.creationTime = creationTime;
 
-        this.cacheControlTask = new ImageMapCacheControlTask(this);
+        this.cacheControlTask = ImageFrame.cacheControlMode.newInstance(this);
         this.isValid = true;
 
         this.accessControl.setPermissionWithoutSave(creator, null);
@@ -131,12 +133,18 @@ public abstract class ImageMap {
     protected void reloadColorCache() {
         if (hasColorCached()) {
             loadColorCache();
+        } else {
+            cacheControlTask.loadCacheIfManual();
         }
     }
 
     protected abstract boolean hasColorCached();
 
     protected abstract void unloadColorCache();
+
+    public BufferedImage getHighResImage(int mapId) {
+        return null;
+    }
 
     public int getImageIndex() {
         return imageIndex;

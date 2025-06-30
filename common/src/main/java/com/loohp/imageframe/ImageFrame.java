@@ -32,6 +32,7 @@ import com.loohp.imageframe.objectholders.IFPlayerManager;
 import com.loohp.imageframe.objectholders.IFPlayerPreference;
 import com.loohp.imageframe.objectholders.ImageMap;
 import com.loohp.imageframe.objectholders.ImageMapAccessPermissionType;
+import com.loohp.imageframe.objectholders.ImageMapCacheControlMode;
 import com.loohp.imageframe.objectholders.ImageMapCreationTaskManager;
 import com.loohp.imageframe.objectholders.ImageMapManager;
 import com.loohp.imageframe.objectholders.IntRange;
@@ -39,14 +40,15 @@ import com.loohp.imageframe.objectholders.IntRangeList;
 import com.loohp.imageframe.objectholders.ItemFrameSelectionManager;
 import com.loohp.imageframe.objectholders.MapMarkerEditManager;
 import com.loohp.imageframe.objectholders.RateLimitedPacketSendingManager;
-import com.loohp.imageframe.objectholders.Scheduler;
 import com.loohp.imageframe.objectholders.UnsetState;
 import com.loohp.imageframe.placeholderapi.Placeholders;
 import com.loohp.imageframe.updater.Updater;
+import com.loohp.imageframe.upload.ImageUploadManager;
 import com.loohp.imageframe.utils.ChatColorUtils;
 import com.loohp.imageframe.utils.MCVersion;
 import com.loohp.imageframe.utils.ModernEventsUtils;
-import com.loohp.imageframe.upload.ImageUploadManager;
+import com.loohp.platformscheduler.ScheduledTask;
+import com.loohp.platformscheduler.Scheduler;
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -82,7 +84,7 @@ public class ImageFrame extends JavaPlugin {
     public static boolean viaDisableSmoothAnimationForLegacyPlayers = false;
 
     public static boolean updaterEnabled;
-    public static Scheduler.ScheduledTask updaterTask = null;
+    public static ScheduledTask updaterTask = null;
 
     public static String messageReloaded;
     public static String messageImageMapProcessing;
@@ -170,9 +172,13 @@ public class ImageFrame extends JavaPlugin {
     public static boolean handleAnimatedMapsOnMainThread;
     public static boolean sendAnimatedMapsOnMainThread;
 
+    public static ImageMapCacheControlMode<?> cacheControlMode;
+    public static boolean tryDeleteBlankMapFiles;
+
     public static boolean uploadServiceEnabled;
-    public static String uploadServiceHost;
-    public static int uploadServicePort;
+    public static String uploadServiceDisplayURL;
+    public static String uploadServiceServerAddress;
+    public static int uploadServiceServerPort;
 
     public static int invisibleFrameMaxConversionsPerSplash;
     public static boolean invisibleFrameGlowEmptyFrames;
@@ -326,7 +332,7 @@ public class ImageFrame extends JavaPlugin {
         Scheduler.runTaskAsynchronously(this, () -> imageMapManager.loadMaps());
         invisibleFrameManager = new InvisibleFrameManager();
         imageMapCreationTaskManager = new ImageMapCreationTaskManager(ImageFrame.parallelProcessingLimit);
-        imageUploadManager = new ImageUploadManager(updaterEnabled, uploadServicePort);
+        imageUploadManager = new ImageUploadManager(uploadServiceEnabled, uploadServiceServerAddress, uploadServiceServerPort);
 
         if (isPluginEnabled("PlaceholderAPI")) {
             new Placeholders().register();
@@ -479,9 +485,13 @@ public class ImageFrame extends JavaPlugin {
         handleAnimatedMapsOnMainThread = config.getConfiguration().getBoolean("Settings.HandleAnimatedMapsOnMainThread");
         sendAnimatedMapsOnMainThread = config.getConfiguration().getBoolean("Settings.SendAnimatedMapsOnMainThread");
 
+        cacheControlMode = ImageMapCacheControlMode.valueOf(config.getConfiguration().getString("Settings.CacheControlMode"));
+        tryDeleteBlankMapFiles = config.getConfiguration().getBoolean("Settings.TryDeleteBlankMapFiles");
+
         uploadServiceEnabled = config.getConfiguration().getBoolean("UploadService.Enabled");
-        uploadServiceHost = config.getConfiguration().getString("UploadService.Host");
-        uploadServicePort = config.getConfiguration().getInt("UploadService.Port");
+        uploadServiceDisplayURL = config.getConfiguration().getString("UploadService.DisplayURL");
+        uploadServiceServerAddress = config.getConfiguration().getString("UploadService.WebServer.Host");
+        uploadServiceServerPort = config.getConfiguration().getInt("UploadService.WebServer.Port");
 
         invisibleFrameMaxConversionsPerSplash = config.getConfiguration().getInt("InvisibleFrame.MaxConversionsPerSplash");
         invisibleFrameGlowEmptyFrames = config.getConfiguration().getBoolean("InvisibleFrame.GlowEmptyFrames");

@@ -18,35 +18,37 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.loohp.imageframe.utils;
+package com.loohp.imageframe.objectholders;
 
-import sun.misc.Unsafe;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import java.lang.reflect.Field;
+public class ImageMapManualPersistentCacheControlTask implements ImageMapCacheControlTask {
 
-public class UnsafeAccessor {
+    private final ImageMap imageMap;
+    private final AtomicBoolean closed;
 
-    private static final Field unsafeField;
-    private static Unsafe unsafe;
-
-    static {
-        try {
-            unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
+    public ImageMapManualPersistentCacheControlTask(ImageMap imageMap) {
+        this.imageMap = imageMap;
+        this.closed = new AtomicBoolean(false);
     }
 
-    public static Unsafe getUnsafe() {
-        if (unsafe != null) {
-            return unsafe;
-        }
-        try {
-            unsafeField.setAccessible(true);
-            return unsafe = (Unsafe) unsafeField.get(null);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+    @Override
+    public ImageMap getImageMap() {
+        return imageMap;
     }
 
+    @Override
+    public void loadCacheIfManual() {
+        imageMap.loadColorCache();
+    }
+
+    @Override
+    public boolean isClosed() {
+        return closed.get();
+    }
+
+    @Override
+    public void close() {
+        closed.set(true);
+    }
 }

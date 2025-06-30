@@ -148,16 +148,31 @@ Settings:
   #Changing this option requires a restart
   HandleAnimatedMapsOnMainThread: false
   SendAnimatedMapsOnMainThread: false
+  #Valid modes are "DYNAMIC" and "MANUAL_PERSISTENT"
+  #DYNAMIC: load and unload image cache depending on whether a player is viewing
+  #May use more CPU and image might appear with a slight delay
+  #MANUAL_PERSISTENT: image cache stay loaded from server start
+  #May use more memory
+  #Changing this setting requires a restart
+  CacheControlMode: "MANUAL_PERSISTENT"
+  #Set this to true if you have corrupted 0 size map data in the world folder (not the ImageFrame plugin folder)
+  #Set this to false if your system's file IO is slow
+  TryDeleteBlankMapFiles: false
 
 #ImageFrame's convenient upload system where you can upload directly through an embedded web server
 UploadService:
   #Changing this value requires a restart
   Enabled: true
   #This is only used for displaying to the end user
-  Host: "http://change.this.to.your.server.ip.in.the.config"
-  #Port in which the webserver is hosted, make sure it is not blocked by your firewall
-  #Changing this value requires a restart
-  Port: 8517
+  DisplayURL: "http://change.this.to.your.server.ip.in.the.config"
+  WebServer:
+    #Address in which the webserver binds to, defaults to 0.0.0.0
+    #Use 127.0.0.1 to limit to local access
+    #Changing this value requires a restart
+    Host: "0.0.0.0"
+    #Port in which the webserver is hosted, make sure it is not blocked by your firewall
+    #Changing this value requires a restart
+    Port: 8517
 
 #ImageFrame's built in survival friendly way of making invisible item frames
 InvisibleFrame:

@@ -20,70 +20,15 @@
 
 package com.loohp.imageframe.objectholders;
 
-import com.loohp.imageframe.ImageFrame;
+public interface ImageMapCacheControlTask extends AutoCloseable {
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+    ImageMap getImageMap();
 
-public class ImageMapCacheControlTask implements Runnable, AutoCloseable {
-    
-    private final ImageMap imageMap;
+    void loadCacheIfManual();
 
-    private final AtomicBoolean locked;
-    private final AtomicBoolean closed;
-
-    private final AtomicReference<Scheduler.ScheduledTask> task;
-    private final AtomicInteger noViewerCounts;
-
-    public ImageMapCacheControlTask(ImageMap imageMap) {
-        this.imageMap = imageMap;
-        this.noViewerCounts = new AtomicInteger(0);
-        this.locked = new AtomicBoolean(false);
-        this.closed = new AtomicBoolean(false);
-        this.task = new AtomicReference<>(Scheduler.runTaskLaterAsynchronously(ImageFrame.plugin, this, 5));
-    }
-
-    public ImageMap getImageMap() {
-        return imageMap;
-    }
-
-    public boolean isLocked() {
-        return locked.get();
-    }
-
-    public void setLocked(boolean locked) {
-        this.locked.set(locked);
-    }
+    boolean isClosed();
 
     @Override
-    public void run() {
-        if (closed.get()) {
-            return;
-        }
-        if (!locked.get()) {
-            if (imageMap.hasViewers()) {
-                noViewerCounts.set(0);
-                if (!imageMap.hasColorCached()) {
-                    imageMap.loadColorCache();
-                }
-            } else {
-                if (noViewerCounts.getAndIncrement() > 200 && imageMap.hasColorCached()) {
-                    imageMap.unloadColorCache();
-                }
-            }
-        }
-        this.task.set(Scheduler.runTaskLaterAsynchronously(ImageFrame.plugin, this, 5));
-    }
+    void close();
 
-    @Override
-    public void close() {
-        closed.set(true);
-        task.updateAndGet(t -> {
-            if (t != null) {
-                t.cancel();
-            }
-            return t;
-        });
-    }
 }
