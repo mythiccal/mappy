@@ -95,8 +95,19 @@ public class IFPlayerManager implements AutoCloseable, Listener {
             File file = new File(dataFolder, uuid + ".json");
             if (file.exists()) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file.toPath()), StandardCharsets.UTF_8))) {
-                    return IFPlayer.load(this, GSON.fromJson(reader, JsonObject.class));
+                    JsonObject jsonObject = GSON.fromJson(reader, JsonObject.class);
+                    if (jsonObject != null) {
+                        return IFPlayer.load(this, jsonObject);
+                    } else {
+                        ImageFrame.plugin.getLogger().warning("Player data file " + file.getAbsolutePath() + " is empty or invalid. Creating new profile.");
+                        try {
+                            return IFPlayer.create(this, uuid);
+                        } catch (Exception createEx) {
+                            throw new RuntimeException("Unable to create fallback ImageFrame player data for " + uuid + " after invalid file load", createEx);
+                        }
+                    }
                 } catch (Exception e) {
+                    ImageFrame.plugin.getLogger().severe("Failed to load ImageFrame player data from " + file.getAbsolutePath() + ": " + e.getMessage());
                     throw new RuntimeException("Unable to load ImageFrame player data from " + file.getAbsolutePath(), e);
                 }
             } else {
