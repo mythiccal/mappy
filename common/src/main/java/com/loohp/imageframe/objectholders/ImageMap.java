@@ -20,15 +20,17 @@
 
 package com.loohp.imageframe.objectholders;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.loohp.imageframe.ImageFrame;
 import com.loohp.imageframe.nms.NMS;
+import com.loohp.imageframe.storage.ImageFrameStorage;
 import com.loohp.imageframe.utils.MapUtils;
 import com.loohp.imageframe.utils.PlayerUtils;
 import com.loohp.imageframe.utils.StringUtils;
 import com.loohp.platformscheduler.Scheduler;
+import net.kyori.adventure.key.Key;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Rotation;
@@ -42,21 +44,17 @@ import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 
 import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -67,18 +65,9 @@ public abstract class ImageMap {
     public static final UUID CONSOLE_CREATOR = new UUID(0, 0);
     public static final String CONSOLE_CREATOR_NAME = "Console";
     public static final String UNKNOWN_CREATOR_NAME = "???";
-    public static final Gson GSON = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
-
-    @SuppressWarnings("unchecked")
-    public static Future<? extends ImageMap> load(ImageMapManager manager, File folder) throws Exception {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(new File(folder, "data.json").toPath()), StandardCharsets.UTF_8))) {
-            JsonObject json = GSON.fromJson(reader, JsonObject.class);
-            String type = json.get("type").getAsString();
-            return (Future<? extends ImageMap>) Class.forName(type).getMethod("load", ImageMapManager.class, File.class, JsonObject.class).invoke(null, manager, folder, json);
-        }
-    }
 
     protected final ImageMapManager manager;
+    protected final ImageMapLoader<?, ?> loader;
 
     protected int imageIndex;
     protected String name;
@@ -95,7 +84,7 @@ public abstract class ImageMap {
     protected final ImageMapCacheControlTask cacheControlTask;
     private boolean isValid;
 
-    public ImageMap(ImageMapManager manager, int imageIndex, String name, List<MapView> mapViews, List<Integer> mapIds, List<Map<String, MapCursor>> mapMarkers, int width, int height, DitheringType ditheringType, UUID creator, Map<UUID, ImageMapAccessPermissionType> hasAccess, long creationTime) {
+    public ImageMap(ImageMapManager manager, ImageMapLoader<?, ?> loader, int imageIndex, String name, List<MapView> mapViews, List<Integer> mapIds, List<Map<String, MapCursor>> mapMarkers, int width, int height, DitheringType ditheringType, UUID creator, Map<UUID, ImageMapAccessPermissionType> hasAccess, long creationTime) {
         if (mapViews.size() != width * height) {
             throw new IllegalArgumentException("mapViews size does not equal width * height");
         }
@@ -106,6 +95,7 @@ public abstract class ImageMap {
             throw new IllegalArgumentException("mapViews size does not equal mapIds size");
         }
         this.manager = manager;
+        this.loader = loader;
         this.imageIndex = imageIndex;
         this.name = StringUtils.sanitize(name);
         this.mapViews = Collections.unmodifiableList(mapViews);
@@ -128,6 +118,57 @@ public abstract class ImageMap {
         return manager;
     }
 
+    public Key getType() {
+        return loader.getIdentifier();
+    }
+
+    @Deprecated
+    public String getLegacyType() {
+        return loader.getLegacyType();
+    }
+
+    public boolean applyUpdate(JsonObject json) {
+        this.name = json.has("name") ? json.get("name").getAsString() : "Unnamed";
+        this.creator = UUID.fromString(json.get("creator").getAsString());
+        DitheringType previousDitheringType = ditheringType;
+        this.ditheringType = DitheringType.fromName(json.has("ditheringType") ? json.get("ditheringType").getAsString() : null);
+
+        if (json.has("hasAccess")) {
+            JsonObject accessJson = json.get("hasAccess").getAsJsonObject();
+            Map<UUID, ImageMapAccessPermissionType> hasAccess = new HashMap<>(accessJson.size());
+            for (Map.Entry<String, JsonElement> entry : accessJson.entrySet()) {
+                hasAccess.put(UUID.fromString(entry.getKey()), ImageMapAccessPermissionType.valueOf(entry.getValue().getAsString().toUpperCase()));
+            }
+            this.accessControl.reapply(hasAccess);
+        }
+
+        JsonArray mapDataJson = json.get("mapdata").getAsJsonArray();
+        int i = 0;
+        for (JsonElement dataJson : mapDataJson) {
+            JsonObject jsonObject = dataJson.getAsJsonObject();
+            Map<String, MapCursor> mapCursors = new ConcurrentHashMap<>();
+            if (jsonObject.has("markers")) {
+                JsonArray markerArray = jsonObject.get("markers").getAsJsonArray();
+                for (JsonElement element : markerArray) {
+                    JsonObject markerData = element.getAsJsonObject();
+                    String markerName = markerData.get("name").getAsString();
+                    byte x = markerData.get("x").getAsByte();
+                    byte y = markerData.get("y").getAsByte();
+                    MapCursor.Type type = MapCursor.Type.valueOf(markerData.get("type").getAsString().toUpperCase());
+                    byte direction = markerData.get("direction").getAsByte();
+                    boolean visible = markerData.get("visible").getAsBoolean();
+                    JsonElement caption = markerData.get("caption");
+                    mapCursors.put(markerName, new MapCursor(x, y, direction, type, visible, caption.isJsonNull() ? null : caption.getAsString()));
+                }
+            }
+            Map<String, MapCursor> markers = this.mapMarkers.get(i++);
+            markers.clear();
+            markers.putAll(mapCursors);
+        }
+
+        return previousDitheringType != ditheringType;
+    }
+
     protected abstract void loadColorCache();
 
     protected void reloadColorCache() {
@@ -142,7 +183,7 @@ public abstract class ImageMap {
 
     protected abstract void unloadColorCache();
 
-    public BufferedImage getHighResImage(int mapId) {
+    public BufferedImage getOriginalImage(int mapId) {
         return null;
     }
 
@@ -259,7 +300,11 @@ public abstract class ImageMap {
         }
     }
 
-    public abstract void save() throws Exception;
+    public void save() throws Exception {
+        save(manager.getStorage(), false);
+    }
+
+    public abstract void save(ImageFrameStorage storage, boolean saveAsCopy) throws Exception;
 
     public ItemStack getMap(int x, int y, String mapNameFormat) {
         return getMap(x, y, mapNameFormat, itemStack -> itemStack);

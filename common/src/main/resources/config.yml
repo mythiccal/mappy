@@ -1,5 +1,7 @@
 Messages:
   Reloaded: "&eImageFrame has been reloaded!"
+  Resync: "&aPerforming resync! See console for details."
+  StorageMigration: "&aPerforming storage migration! See console for details."
   ImageMapProcessing: "&eImageMap is being processed, please wait!"
   #Leave this empty ("") to disable action bar message
   ImageMapProcessingActionBar: "&eImageMap &a{Name} &eis being processed{Dots}"
@@ -174,6 +176,11 @@ UploadService:
     #Changing this value requires a restart
     Port: 8517
 
+#ImageFrame's complimentary mod where you can see images in its native resolution in full color
+ImageFrameClient:
+  #Changing this value requires a restart
+  Enabled: true
+
 #ImageFrame's built in survival friendly way of making invisible item frames
 InvisibleFrame:
   #Survival friendly way to get invisible item frames by splashing dropped items with invisibility potions
@@ -183,6 +190,19 @@ InvisibleFrame:
   #Should empty invisible item frames glow
   #Existing frames are not updated until they are interacted with
   GlowEmptyFrames: true
+
+#Which storage system should ImageFrame use
+#Changing this section requires a restart
+Storage:
+  #Supported storage systems: file (Default), jdbc
+  Type: file
+  #Options are only used if the storage system type requires it, such as jdbc
+  Options:
+    JdbcUrl: "jdbc:mysql://localhost:3306/imageframe"
+    Username: "imageframe"
+    Password: "imageframe"
+    #In Seconds
+    ActivePollInterval: 5
 
 Hooks:
   ViaVersion:

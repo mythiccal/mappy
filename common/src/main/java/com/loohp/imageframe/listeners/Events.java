@@ -21,9 +21,9 @@
 package com.loohp.imageframe.listeners;
 
 import com.loohp.imageframe.ImageFrame;
-import com.loohp.imageframe.nms.NMS;
 import com.loohp.imageframe.utils.MapUtils;
 import com.loohp.imageframe.utils.ModernEventsUtils;
+import com.loohp.imageframe.utils.SlotAccessor;
 import com.loohp.platformscheduler.Scheduler;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
@@ -44,6 +44,8 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.inventory.EntityEquipment;
@@ -52,8 +54,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.map.MapView;
 
-import java.util.Collection;
-import java.util.function.IntFunction;
+import static com.loohp.imageframe.objectholders.CombinedMapItemHandler.containsCombinedMaps;
+import static com.loohp.imageframe.objectholders.CombinedMapItemHandler.isCombinedMaps;
+import static com.loohp.imageframe.utils.ImageFilledMapUtils.processImageFilledMap;
+import static com.loohp.imageframe.utils.ImageFilledMapUtils.processImageFilledMaps;
 
 public class Events implements Listener {
 
@@ -66,6 +70,10 @@ public class Events implements Listener {
             if (ImageFrame.imageMapManager.isMapDeleted(currentMapView) && !ImageFrame.exemptMapIdsFromDeletion.satisfies(currentMapView.getId())) {
                 event.setCurrentItem(new ItemStack(Material.MAP, currentItem.getAmount()));
             }
+        }
+        ItemStack replacement = processImageFilledMap(event.getCurrentItem());
+        if (replacement != null) {
+            event.setCurrentItem(replacement);
         }
 
         boolean isClickingTop = event.getView().getTopInventory().equals(event.getClickedInventory());
@@ -167,31 +175,6 @@ public class Events implements Listener {
         }
     }
 
-    public boolean containsCombinedMaps(IntFunction<ItemStack> slotAccess, int size) {
-        return containsCombinedMaps(slotAccess, 0, size);
-    }
-
-    public boolean containsCombinedMaps(IntFunction<ItemStack> slotAccess, int begin, int size) {
-        for (int i = begin; i < size; i++) {
-            ItemStack itemStack = slotAccess.apply(i);
-            if (isCombinedMaps(itemStack)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public boolean containsCombinedMaps(Collection<ItemStack> itemStacks) {
-        return itemStacks.stream().anyMatch(itemStack -> isCombinedMaps(itemStack));
-    }
-
-    public boolean isCombinedMaps(ItemStack itemStack) {
-        if (itemStack != null && itemStack.getType().equals(Material.PAPER)) {
-            return NMS.getInstance().getCombinedMapItemInfo(itemStack) != null;
-        }
-        return false;
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerSwitchSlot(PlayerItemHeldEvent event) {
         Inventory inventory = event.getPlayer().getInventory();
@@ -202,6 +185,10 @@ public class Events implements Listener {
             if (ImageFrame.imageMapManager.isMapDeleted(currentMapView) && !ImageFrame.exemptMapIdsFromDeletion.satisfies(currentMapView.getId())) {
                 inventory.setItem(slot, new ItemStack(Material.MAP, currentItem.getAmount()));
             }
+        }
+        ItemStack replacement = processImageFilledMap(inventory.getItem(slot));
+        if (replacement != null) {
+            inventory.setItem(slot, replacement);
         }
     }
 
@@ -222,6 +209,10 @@ public class Events implements Listener {
                 equipment.setItem(hand, new ItemStack(Material.MAP, currentItem.getAmount()));
             }
         }
+        ItemStack replacement = processImageFilledMap(equipment.getItem(hand));
+        if (replacement != null) {
+            equipment.setItem(hand, replacement);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -234,6 +225,10 @@ public class Events implements Listener {
             if (ImageFrame.imageMapManager.isMapDeleted(currentMapView) && !ImageFrame.exemptMapIdsFromDeletion.satisfies(currentMapView.getId())) {
                 equipment.setItem(hand, new ItemStack(Material.MAP, currentItem.getAmount()));
             }
+        }
+        ItemStack replacement = processImageFilledMap(equipment.getItem(hand));
+        if (replacement != null) {
+            equipment.setItem(hand, replacement);
         }
 
         Entity entity = event.getRightClicked();
@@ -274,6 +269,10 @@ public class Events implements Listener {
                 item.setItemStack(new ItemStack(Material.MAP, currentItem.getAmount()));
             }
         }
+        ItemStack replacement = processImageFilledMap(item.getItemStack());
+        if (replacement != null) {
+            item.setItemStack(replacement);
+        }
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -296,6 +295,18 @@ public class Events implements Listener {
                 }
             }
         }, chunk);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Inventory inventory = event.getPlayer().getInventory();
+        processImageFilledMaps(SlotAccessor.of(i -> inventory.getItem(i), (i, s) -> inventory.setItem(i, s)), inventory.getSize());
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Inventory inventory = event.getPlayer().getInventory();
+        processImageFilledMaps(SlotAccessor.of(i -> inventory.getItem(i), (i, s) -> inventory.setItem(i, s)), inventory.getSize());
     }
 
     public static class ModernEvents implements Listener {

@@ -46,13 +46,27 @@ public class Charts {
             }
         }));
 
+        metrics.addCustomChart(new Metrics.AdvancedPie("images_created_by_type_id", new Callable<Map<String, Integer>>() {
+            @Override
+            public Map<String, Integer> call() throws Exception {
+                Map<String, Integer> valueMap = new HashMap<>();
+                for (ImageMap imageMap : ImageFrame.imageMapManager.getMaps()) {
+                    String type = imageMap.getType().asString();
+                    valueMap.merge(type, 1, Integer::sum);
+                }
+                return valueMap;
+            }
+        }));
+
         metrics.addCustomChart(new Metrics.AdvancedPie("images_created_by_type", new Callable<Map<String, Integer>>() {
             @Override
             public Map<String, Integer> call() throws Exception {
                 Map<String, Integer> valueMap = new HashMap<>();
                 for (ImageMap imageMap : ImageFrame.imageMapManager.getMaps()) {
-                    String type = imageMap.getClass().getName();
-                    valueMap.merge(type, 1, Integer::sum);
+                    String type = imageMap.getLegacyType();
+                    if (type != null) {
+                        valueMap.merge(type, 1, Integer::sum);
+                    }
                 }
                 return valueMap;
             }
@@ -102,6 +116,20 @@ public class Charts {
             public Integer call() throws Exception {
                 long value = ImageFrame.imageUploadManager.getImagesUploadedCounter().getAndSet(0);
                 return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+            }
+        }));
+
+        metrics.addCustomChart(new Metrics.SimplePie("storage_type", new Callable<String>() {
+            @Override
+            public String call() throws Exception {
+                return ImageFrame.imageFrameStorage.getLoader().getIdentifier().asString();
+            }
+        }));
+
+        metrics.addCustomChart(new Metrics.SingleLineChart("players_with_imageframe_client", new Callable<Integer>() {
+            @Override
+            public Integer call() throws Exception {
+                return ImageFrame.customClientNetworkManager.getPlayers().size();
             }
         }));
 

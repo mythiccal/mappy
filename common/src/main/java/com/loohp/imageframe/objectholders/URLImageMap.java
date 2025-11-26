@@ -20,6 +20,7 @@
 
 package com.loohp.imageframe.objectholders;
 
+import com.google.gson.JsonObject;
 import org.bukkit.map.MapCursor;
 import org.bukkit.map.MapView;
 
@@ -31,8 +32,8 @@ public abstract class URLImageMap extends ImageMap {
 
     protected String url;
 
-    public URLImageMap(ImageMapManager manager, int imageIndex, String name, String url, List<MapView> mapViews, List<Integer> mapIds, List<Map<String, MapCursor>> mapMarkers, int width, int height, DitheringType ditheringType, UUID creator, Map<UUID, ImageMapAccessPermissionType> hasAccess, long creationTime) {
-        super(manager, imageIndex, name, mapViews, mapIds, mapMarkers, width, height, ditheringType, creator, hasAccess, creationTime);
+    public URLImageMap(ImageMapManager manager, ImageMapLoader<?, ?> loader, int imageIndex, String name, String url, List<MapView> mapViews, List<Integer> mapIds, List<Map<String, MapCursor>> mapMarkers, int width, int height, DitheringType ditheringType, UUID creator, Map<UUID, ImageMapAccessPermissionType> hasAccess, long creationTime) {
+        super(manager, loader, imageIndex, name, mapViews, mapIds, mapMarkers, width, height, ditheringType, creator, hasAccess, creationTime);
         this.url = url;
     }
 
@@ -44,4 +45,11 @@ public abstract class URLImageMap extends ImageMap {
         this.url = url;
     }
 
+    @Override
+    public boolean applyUpdate(JsonObject json) {
+        String previousUrl = url;
+        this.url = json.get("url").getAsString();
+        boolean parentShouldUpdateColorCache = super.applyUpdate(json);
+        return parentShouldUpdateColorCache || !previousUrl.equals(url);
+    }
 }

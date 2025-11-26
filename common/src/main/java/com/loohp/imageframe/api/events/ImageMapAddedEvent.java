@@ -18,34 +18,35 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.loohp.imageframe.utils;
+package com.loohp.imageframe.api.events;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import com.loohp.imageframe.objectholders.ImageMap;
+import com.loohp.platformscheduler.Scheduler;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.Event;
+import org.bukkit.event.HandlerList;
 
-public class DataTypeIO {
-	
-	public static int readVarInt(DataInputStream in) throws IOException {
-		int i = 0;
-		int j = 0;
-		byte b;
-		do {
-			b = in.readByte();
-			i |= (b & 127) << j++ * 7;
-			if (j > 5) {
-				throw new RuntimeException("VarInt too big");
-			}
-		} while ((b & 128) == 128);
-		return i;
-	}
-	
-	public static void writeVarInt(DataOutputStream out, int value) throws IOException {
-		while ((value & -128) != 0) {
-			out.writeByte(value & 127 | 128);
-			value >>>= 7;
-		}
-		out.writeByte(value);
-	}
+public class ImageMapAddedEvent extends Event {
+
+    private static final HandlerList HANDLERS = new HandlerList();
+
+    public static HandlerList getHandlerList() {
+        return HANDLERS;
+    }
+
+    private final ImageMap imageMap;
+
+    public ImageMapAddedEvent(ImageMap imageMap) {
+        super(!Scheduler.isPrimaryThread());
+        this.imageMap = imageMap;
+    }
+
+    public ImageMap getImageMap() {
+        return imageMap;
+    }
+
+    public HandlerList getHandlers() {
+        return HANDLERS;
+    }
 
 }
