@@ -36,24 +36,25 @@ import org.apache.commons.fileupload.MultipartStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ImageUploadManager implements AutoCloseable {
 
-    public static final Duration EXPIRATION = Duration.ofMinutes(5);
+    public static final int EXPIRATION = 300000;
 
     private final HttpServer server;
     private final File webRootDir;
@@ -74,7 +75,7 @@ public class ImageUploadManager implements AutoCloseable {
             }
             JarUtils.copyFolderFromJar("upload/web", ImageFrame.plugin.getDataFolder(), JarUtils.CopyOption.COPY_IF_NOT_EXIST);
             Cache<UUID, PendingUpload> cache = CacheBuilder.newBuilder()
-                    .expireAfterAccess(EXPIRATION)
+                    .expireAfterAccess(EXPIRATION, TimeUnit.MILLISECONDS)
                     .removalListener((RemovalNotification<UUID, PendingUpload> notification) -> {
                         if (notification.wasEvicted()) {
                             PendingUpload pendingUpload = notification.getValue();
@@ -97,8 +98,10 @@ public class ImageUploadManager implements AutoCloseable {
             } else {
                 this.server = null;
             }
+        } catch (BindException e) {
+            throw new RuntimeException("Unable to start ImageFrame upload server (Perhaps there is a network port clash?)", e);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Unable to start ImageFrame upload server", e);
         }
     }
 
@@ -248,7 +251,7 @@ public class ImageUploadManager implements AutoCloseable {
 
                 pendingUploads.remove(UUID.fromString(user));
                 pendingUpload.getFuture().complete(outputFile);
-                Scheduler.runTaskLaterAsynchronously(ImageFrame.plugin, () -> outputFile.delete(), EXPIRATION.toMillis() / 50);
+                Scheduler.runTaskLaterAsynchronously(ImageFrame.plugin, () -> outputFile.delete(), EXPIRATION / 50);
 
                 // Send response
                 sendResponse(exchange, 200, "{\"message\":\"File uploaded successfully\"}");
