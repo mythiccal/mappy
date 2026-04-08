@@ -25,22 +25,29 @@ import com.loohp.imageframe.objectholders.DitheringType;
 import com.loohp.imageframe.objectholders.ImageMap;
 import com.loohp.imageframe.objectholders.ImageMapCreationTask;
 import com.loohp.imageframe.objectholders.ImageMapCreationTaskManager;
-import com.loohp.imageframe.objectholders.URLAnimatedImageMap;
-import com.loohp.imageframe.objectholders.URLStaticImageMap;
-import com.loohp.imageframe.upload.ImageUploadManager;
+import com.loohp.imageframe.objectholders.ImageMapLoader;
+import com.loohp.imageframe.objectholders.ImageMapLoaders;
+import com.loohp.imageframe.objectholders.URLImageMap;
+import com.loohp.imageframe.objectholders.URLImageMapCreateInfo;
 import com.loohp.imageframe.upload.PendingUpload;
 import com.loohp.imageframe.utils.HTTPRequestUtils;
 import com.loohp.platformscheduler.Scheduler;
 import com.loohp.imageframe.utils.MapUtils;
 import com.loohp.imageframe.utils.PlayerUtils;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
+
+import static com.loohp.imageframe.language.TranslationKey.IMAGE_MAP_CREATED;
+import static com.loohp.imageframe.language.TranslationKey.UNABLE_TO_LOAD_MAP;
+import static com.loohp.imageframe.utils.ComponentUtils.translatable;
 
 /**
  * API for the ImageFrame plugin
@@ -155,14 +162,15 @@ public class ImageFrameAPI {
                 
                 String finalUrl = url;
                 String finalImageType = imageType;
-                
+                CommandSender permissionSender = player != null ? player : Bukkit.getConsoleSender();
+
                 // Create and queue the map task
-                creationTask = ImageFrame.imageMapCreationTaskManager.enqueue(creator, name, width, height, () -> {
-                    if (finalImageType.equals(MapUtils.GIF_CONTENT_TYPE)) {
-                        return URLAnimatedImageMap.create(ImageFrame.imageMapManager, name, finalUrl, width, height, ditheringType, creator).get();
-                    } else {
-                        return URLStaticImageMap.create(ImageFrame.imageMapManager, name, finalUrl, width, height, ditheringType, creator).get();
+                creationTask = ImageFrame.imageMapCreationTaskManager.enqueue(creator, name, () -> {
+                    ImageMapLoader<? extends URLImageMap, URLImageMapCreateInfo> loader = ImageMapLoaders.getLoader(URLImageMap.class, URLImageMapCreateInfo.class, finalImageType, permissionSender);
+                    if (loader == null) {
+                        throw new IllegalStateException("No suitable loader for this image type");
                     }
+                    return loader.create(new URLImageMapCreateInfo(ImageFrame.imageMapManager, name, finalUrl, width, height, ditheringType, creator)).get();
                 });
                 
                 // Get the result and add it to the manager
@@ -178,7 +186,7 @@ public class ImageFrameAPI {
                     }
                 }
                 
-                creationTask.complete("Success");
+                creationTask.complete(translatable(IMAGE_MAP_CREATED).color(NamedTextColor.GREEN));
                 future.complete(imageMap);
                 
             } catch (ImageMapCreationTaskManager.EnqueueRejectedException e) {
@@ -191,7 +199,7 @@ public class ImageFrameAPI {
                     PlayerUtils.giveItem(player, new ItemStack(Material.MAP, finalTakenMaps));
                 }
                 if (creationTask != null) {
-                    creationTask.complete("Failed");
+                    creationTask.complete(translatable(UNABLE_TO_LOAD_MAP).color(NamedTextColor.RED));
                 }
                 future.completeExceptionally(e);
             }

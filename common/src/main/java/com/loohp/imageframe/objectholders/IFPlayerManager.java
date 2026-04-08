@@ -84,29 +84,9 @@ public class IFPlayerManager implements AutoCloseable, Listener {
 
     public IFPlayer getIFPlayer(UUID uuid) {
         return loadedPlayers.computeIfAbsent(uuid, k -> {
-            dataFolder.mkdirs();
-            File file = new File(dataFolder, uuid + ".json");
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file.toPath()), StandardCharsets.UTF_8))) {
-                    JsonObject jsonObject = GSON.fromJson(reader, JsonObject.class);
-                    if (jsonObject != null) {
-                        return IFPlayer.load(this, jsonObject);
-                    } else {
-                        ImageFrame.plugin.getLogger().warning("Player data file " + file.getAbsolutePath() + " is empty or invalid. Creating new profile.");
-                        try {
-                            return IFPlayer.create(this, uuid);
-                        } catch (Exception createEx) {
-                            throw new RuntimeException("Unable to create fallback ImageFrame player data for " + uuid + " after invalid file load", createEx);
-                        }
-                    }
-                } catch (Exception e) {
-                    new RuntimeException("Unable to load ImageFrame player data from " + file.getAbsolutePath(), e).printStackTrace();
-                    try {
-                        Files.copy(file.toPath(), new File(file.getParentFile(), file.getName() + ".bak").toPath());
-                    } catch (IOException ex) {
-                        new RuntimeException("Unable to backup ImageFrame player data from " + file.getAbsolutePath(), ex).printStackTrace();
-                    }
-                }
+            JsonObject jsonObject = imageFrameStorage.loadPlayerData(this, uuid);
+            if (jsonObject != null) {
+                return IFPlayer.load(this, jsonObject);
             }
             return createNewIfPlayer(uuid);
         });
