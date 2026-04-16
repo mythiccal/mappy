@@ -84,14 +84,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
-public class V26_1 extends NMSWrapper {
+public class V26_1_2 extends NMSWrapper {
 
     private final Field nmsEntityByteDataWatcherField;
     private final Field craftMapViewWorldMapField;
     private final Field persistentIdCountsLastMapIdField;
     private final Field renderDataCursorsField;
 
-    public V26_1() {
+    public V26_1_2() {
         try {
             nmsEntityByteDataWatcherField = ReflectionUtils.findDeclaredField(net.minecraft.world.entity.Entity.class, EntityDataAccessor.class, "DATA_SHARED_FLAGS_ID");
             craftMapViewWorldMapField = CraftMapView.class.getDeclaredField("worldMap");
